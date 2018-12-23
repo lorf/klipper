@@ -10,12 +10,14 @@ ENDSTOP_SAMPLE_TIME = .000015
 ENDSTOP_SAMPLE_COUNT = 4
 
 class Homing:
-    def __init__(self, printer):
+    def __init__(self, printer, args = {}):
         self.printer = printer
         self.toolhead = printer.lookup_object('toolhead')
+        self.gcode = printer.lookup_object('gcode')
         self.changed_axes = []
         self.verify_retract = True
         self.endstops_pending = -1
+        self.args = args
     def set_no_verify_retract(self):
         self.verify_retract = False
     def set_axes(self, axes):
@@ -97,8 +99,50 @@ class Homing:
         endstops = [es for rail in rails for es in rail.get_endstops()]
         hi = rails[0].get_homing_info()
         self.homing_move(movepos, endstops, hi.speed)
+        # Perform ENDSTOP_TEST if requested
+        if self.args.get('do_endstop_test'):
+            assert 'endstop_test_dist' in self.args
+            assert 'endstop_test_count' in self.args
+
+            move_d = math.sqrt(sum([d*d for d in axes_d[:3]]))
+            retract_r = min(1., self.args['endstop_test_dist'] / move_d)
+            retractpos = [mp - ad * retract_r
+                        for mp, ad in zip(movepos, axes_d)]
+            forcepos = [rp - ad * retract_r
+                        for rp, ad in zip(retractpos, axes_d)]
+            steppers = [s for rail in rails for s in rail.get_steppers()]
+            pos_ll = [[] for s in steppers];
+            for n in range(self.args['endstop_test_count']):
+                # Retract
+                self.toolhead.move(retractpos, homing_speed)
+                # Home again
+                self.toolhead.set_position(forcepos)
+                self.homing_move(movepos, endstops, second_homing_speed,
+                                verify_movement=self.verify_retract)
+                # Save current stepper positions
+                spos = [s.get_mcu_position() for s in steppers]
+                for pv, sp in zip(pos_ll, spos):
+                    pv.append(sp)
+                pos_s = " ".join(
+                    ["%s:%.6fmm" % (s.get_name(), sp * s.get_step_dist())
+                        for s, sp in zip(steppers, spos)])
+                self.gcode.respond_info(
+                        "ENDSTOP_TEST %d: %s" % (n, pos_s))
+            means = [sum(v) / float(len(v)) for v in pos_ll]
+            ranges = [float(max(v) - min(v)) for v in pos_ll]
+            stddevs = [math.sqrt(sum([
+                    (float(val) - m) ** 2 for val in v
+                ]) / len(v)) for v, m in zip(pos_ll, means)]
+            msg = "ENDSTOP_TEST results:\n"
+            for s, p, r, sd in zip(steppers, pos_ll, ranges, stddevs):
+                msg += ("%s: count:%d range:%.6fmm stddev:%.6fmm\n"
+                    % (s.get_name(),
+                        len(p),
+                        r * s.get_step_dist(),
+                        sd * s.get_step_dist()))
+            self.gcode.respond_info(msg)
         # Perform second home
-        if hi.retract_dist:
+        elif hi.retract_dist:
             # Retract
             axes_d = [mp - fp for mp, fp in zip(movepos, forcepos)]
             move_d = math.sqrt(sum([d*d for d in axes_d[:3]]))

@@ -518,15 +518,31 @@ class GCodeParser:
         else:
             delay = self.get_float('P', params, 0., minval=0.) / 1000.
         self.toolhead.dwell(delay)
+    # ENDSTOP_TEST command is implemented as an alias to G28 since
+    # it's functionality is almost the same
+    cmd_G28_aliases = ["ENDSTOP_TEST"]
     def cmd_G28(self, params):
         # Move to origin
         axes = []
+        args = {}
         for axis in 'XYZ':
             if axis in params:
                 axes.append(self.axis2pos[axis])
         if not axes:
             axes = [0, 1, 2]
-        homing_state = homing.Homing(self.printer)
+        if params['#command'] == 'ENDSTOP_TEST':
+            if 'COUNT' not in params or 'DISTANCE' not in params:
+                raise self.error(
+                    "Error on '%s': COUNT and ENDSTOP parameters are mandatory"
+                        % (params['#original']))
+            args.update({
+                    'do_endstop_test': True,
+                    'endstop_test_count':
+                        self.get_int('COUNT', params, minval=1),
+                    'endstop_test_dist':
+                        self.get_float('DISTANCE', params, minval=0.)
+                })
+        homing_state = homing.Homing(self.printer, args)
         if self.is_fileinput:
             homing_state.set_no_verify_retract()
         homing_state.home_axes(axes)

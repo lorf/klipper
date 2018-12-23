@@ -87,6 +87,12 @@ The following standard commands are supported:
 - `QUERY_ENDSTOPS`: Probe the axis endstops and report if they are
   "triggered" or in an "open" state. This command is typically used to
   verify that an endstop is working correctly.
+- `ENDSTOP_TEST COUNT=<repetitions> DISTANCE=<retract_distance> [X=0] [Y=0]
+  [Z=0]`: Test endstop repeatability. This command will probe all or specified
+  endstops `COUNT` number of times and show statistics (error range and
+  standard deviation) for each tested endstop. It uses the homing speed
+  parameters (`homing_speed` and `second_homing_speed`) from `stepper` sections
+  of a config file.
 - `GET_POSITION`: Return information on the current location of the
   toolhead.
 - `SET_GCODE_OFFSET [X=<pos>|X_ADJUST=<adjust>]

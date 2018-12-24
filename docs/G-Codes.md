@@ -170,6 +170,16 @@ The following standard commands are supported:
   ((floor(z_height / band) + .5) * band)`.
 - `SET_IDLE_TIMEOUT [TIMEOUT=<timeout>]`:  Allows the user to set the
   idle timeout (in seconds).
+- `FAN [SPEED=<value>] [RATE=<value>] [IGNORE_M106=<0|1>]`: This command is
+  intended to be used in display menus and host control software to override
+  part cooling fan control commands, issued by slicer software, and manualy
+  control the fan. `SPEED` parameter accepts values in 0-255 range and sets
+  part cooling fan speed. `RATE` parameter accepts percentage values and sets a
+  factor applied to the `M106` (set fan speed) command when setting fan speed.
+  It does not affect `SPEED` parameter. If the `IGNORE_M106=1` parameter is
+  specified, then all the future `M106` and `M107` (switch fan off) commands
+  will be ignored until the `FAN IGNORE_M106=0` command is issued. It does not
+  affect `SPEED` parameter.
 - `RESTART`: This will cause the host software to reload its config
   and perform an internal reset. This command will not clear error
   state from the micro-controller (see FIRMWARE_RESTART) nor will it

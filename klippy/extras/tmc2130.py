@@ -37,10 +37,36 @@ def ffs(mask):
 
 # Provide a string description of a register
 def pretty_format(all_fields, reg_name, value):
-    fields = [ " %s=%d" % (field_name, (value & mask) >> ffs(mask))
-               for field_name, mask in all_fields.get(reg_name, {}).items()
-               if value & mask ]
-    return "%-15s %08x%s" % (reg_name + ":", value, "".join(fields))
+    fields = []
+    for field_name, field in all_fields.get(reg_name, {}).items():
+        mask = field[0]
+        desc = field[1] if len(field) > 1 else None
+        to_str = field[2] if len(field) > 2 else None
+        dval = (value & mask) >> ffs(mask)
+        fields.append(" %s%s = %d%s" % (
+            field_name,
+            " (" + desc + ")" if desc else "",
+            dval,
+            " (" + to_str(dval) + ")" if to_str else ""))
+    return "%-15s %08x%s" % (reg_name + ":", value, ",".join(fields))
+
+# Decode two's complement signed integer
+def decode_signed_int(val, bits):
+    if ((val >> (bits - 1)) & 1):
+        return val - (1 << bits)
+    return val
+
+# Returns value of the register field
+def get_field(all_fields, reg_name, field_name, reg_value):
+    field = all_fields.get(reg_name, {}).get(field_name, None)
+    mask = field[0]
+    return (reg_value & mask) >> ffs(mask)
+
+# Returns register value with field bits filled with supplied field value
+def set_field(all_fields, reg_name, field_name, reg_value, field_value):
+    field = all_fields.get(reg_name, {}).get(field_name, None)
+    mask = field[0]
+    return (reg_value & ~mask) | ((field_value << ffs(mask)) & mask)
 
 
 ######################################################################
